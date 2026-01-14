@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>RFID Access Control Dashboard</title>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+<!-- Font -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --bg:#f5f7fb;
+  --card:#ffffff;
+  --primary:#2563eb;
+  --border:#e5e7eb;
+  --text:#111827;
+  --muted:#6b7280;
+}
+
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  font-family:'Inter',sans-serif;
+  background:var(--bg);
+  color:var(--text);
+}
+
+/* ===== HEADER ===== */
+header{
+  background:linear-gradient(135deg,#2563eb,#1e40af);
+  color:#fff;
+  padding:24px 32px;
+  font-size:24px;
+  font-weight:700;
+}
+
+/* ===== LAYOUT ===== */
+.container{
+  max-width:1500px;
+  margin:auto;
+  padding:32px;
+}
+
+.section{
+  background:var(--card);
+  border-radius:16px;
+  padding:24px;
+  box-shadow:0 10px 30px rgba(0,0,0,.06);
+  margin-bottom:32px;
+}
+
+.section h2{
+  margin:0 0 16px;
+  font-size:20px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+/* ===== TABLE ===== */
+table{
+  width:100%;
+  border-collapse:separate;
+  border-spacing:0 10px;
+  font-size:14px;
+}
+
+thead th{
+  text-align:left;
+  padding:12px;
+  color:var(--muted);
+  font-weight:600;
+}
+
+tbody tr{
+  background:#fafafa;
+  transition:.2s;
+}
+
+tbody tr:hover{
+  background:#f1f5f9;
+}
+
+td{
+  padding:14px 12px;
+}
+
+td:first-child{
+  border-radius:12px 0 0 12px;
+}
+td:last-child{
+  border-radius:0 12px 12px 0;
+}
+
+/* ===== BADGES ===== */
+.badge{
+  padding:6px 14px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:600;
+  display:inline-block;
+}
+
+.allow{
+  background:#dcfce7;
+  color:#166534;
+}
+.deny{
+  background:#fee2e2;
+  color:#991b1b;
+}
+.na{
+  background:#e5e7eb;
+  color:#374151;
+}
+
+/* ===== LOG ===== */
+.log-box{
+  max-height:360px;
+  overflow-y:auto;
+}
+.log-box tr{
+  background:#fff;
+}
+
+/* ===== RESPONSIVE ===== */
+@media(max-width:900px){
+  table{font-size:13px}
+}
+</style>
+</head>
+
+<body>
+
+<header>🔐 RFID Access Control Dashboard</header>
+
+<div class="container">
+
+<!-- ===== USERS ===== -->
+<div class="section">
+  <h2>👤 Users (uid)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>UserKey</th>
+        <th>Name</th>
+        <th>Type</th>
+        <th>Status</th>
+        <th>Date</th>
+        <th>Last In</th>
+        <th>Last Out</th>
+      </tr>
+    </thead>
+    <tbody id="uidTable"></tbody>
+  </table>
+</div>
+
+<!-- ===== RFID ===== -->
+<div class="section">
+  <h2>📛 RFID Mapping</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>RFID UID</th>
+        <th>UserKey</th>
+      </tr>
+    </thead>
+    <tbody id="rfidTable"></tbody>
+  </table>
+</div>
+
+<!-- ===== LOG ===== -->
+<div class="section">
+  <h2>📜 Access Log</h2>
+  <div class="log-box">
+    <table>
+      <thead>
+        <tr>
+          <th>UID</th>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Result</th>
+          <th>Time</th>
+        </tr>
+      </thead>
+      <tbody id="logTable"></tbody>
+    </table>
+  </div>
+</div>
+
+</div>
+
+<script>
+// ===== Firebase config =====
+firebase.initializeApp({
+  apiKey: "AIzaSyAYEnyFrWA-smpNX_2vJZlwgZtdBi8RqP0",
+  databaseURL: "https://rfid-a5c39-default-rtdb.firebaseio.com",
+  projectId: "rfid-a5c39"
+});
+const db = firebase.database();
+
+/* ===== USERS ===== */
+db.ref("uid").on("value", snap=>{
+  uidTable.innerHTML="";
+  const data=snap.val()||{};
+  for(let k in data){
+    const u=data[k];
+    const status=u.access
+      ? `<span class="badge ${u.access==="allow"?"allow":"deny"}">${u.access}</span>`
+      : `<span class="badge na">-</span>`;
+    uidTable.innerHTML+=`
+      <tr>
+        <td>${k}</td>
+        <td>${u.name ?? "-"}</td>
+        <td>${u.type ?? "-"}</td>
+        <td>${status}</td>
+        <td>${u.date ?? "-"}</td>
+        <td>${u.last_visit_in ?? "-"}</td>
+        <td>${u.last_visit_out ?? "-"}</td>
+      </tr>
+    `;
+  }
+});
+
+/* ===== RFID ===== */
+db.ref("rfid_to_user").on("value", snap=>{
+  rfidTable.innerHTML="";
+  const data=snap.val()||{};
+  for(let r in data){
+    rfidTable.innerHTML+=`
+      <tr>
+        <td>${r}</td>
+        <td>${data[r]}</td>
+      </tr>
+    `;
+  }
+});
+
+/* ===== LOG ===== */
+db.ref("log").limitToLast(50).on("child_added", snap=>{
+  const d=snap.val();
+  const cls=d.result?.startsWith("allow")?"allow":"deny";
+  logTable.innerHTML=`
+    <tr>
+      <td>${d.uid}</td>
+      <td>${d.name}</td>
+      <td>${d.type}</td>
+      <td><span class="badge ${cls}">${d.result}</span></td>
+      <td>${d.time}</td>
+    </tr>
+  `+logTable.innerHTML;
+});
+</script>
+
+</body>
+</html>
